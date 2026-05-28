@@ -32,8 +32,7 @@ Accepted header aliases:
 
 ## Notes
 
-- URLs must resolve through WordPress `url_to_postid()`.
-- If direct URL matching fails, the plugin also tries normalized URLs, home-relative paths, and path/slug matching.
+- The plugin first tries WordPress `url_to_postid()` and then falls back to normalized URLs, home-relative paths, and path/slug matching.
 - Ambiguous fallback matches are skipped and reported instead of guessed.
 - The plugin writes Yoast values to `_yoast_wpseo_title` and `_yoast_wpseo_metadesc`.
 - XLSX support requires PHP `ZipArchive`.

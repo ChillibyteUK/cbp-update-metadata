@@ -6,8 +6,10 @@
  * Author: Chillibyte - DS
  */
 
-
 defined( 'ABSPATH' ) || exit;
+
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
 /**
  * Class CBP_Update_Metadata_Plugin
@@ -250,37 +252,30 @@ class CBP_Update_Metadata_Plugin {
      * @return array|WP_Error   Array of rows or WP_Error on failure.
      */
     private function parse_csv_file( string $file_path ) {
-        global $wp_filesystem;
-        if ( empty( $wp_filesystem ) ) {
-            require_once ABSPATH . '/wp-admin/includes/file.php';
-            WP_Filesystem();
-        }
-
-        $csv_content = $wp_filesystem->get_contents( $file_path );
-        if ( false === $csv_content ) {
+        $handle = fopen( $file_path, 'r' );
+        if ( false === $handle ) {
             return new WP_Error( 'cbp_csv_open_failed', 'Could not open the CSV file.' );
         }
 
-        $lines = preg_split( '/\r\n|\r|\n/', $csv_content );
-        if ( empty( $lines ) ) {
+        $headers = fgetcsv( $handle );
+        if ( false === $headers ) {
+            fclose( $handle );
             return new WP_Error( 'cbp_csv_headers_missing', 'The CSV file is empty.' );
         }
 
-        $headers            = str_getcsv( array_shift( $lines ) );
         $normalized_headers = $this->normalize_headers( $headers );
         $mapped_headers     = $this->map_headers( $normalized_headers );
         if ( is_wp_error( $mapped_headers ) ) {
+            fclose( $handle );
             return $mapped_headers;
         }
 
         $rows = array();
-        foreach ( $lines as $line ) {
-            if ( '' === trim( $line ) ) {
-                continue;
-            }
-            $data   = str_getcsv( $line );
+        while ( ( $data = fgetcsv( $handle ) ) !== false ) {
             $rows[] = $this->extract_row_from_columns( $mapped_headers, $data );
         }
+
+        fclose( $handle );
 
         return $rows;
     }
@@ -372,7 +367,9 @@ class CBP_Update_Metadata_Plugin {
     private function normalize_headers( array $headers ): array {
         return array_map(
             static function ( $header ): string {
-				return strtolower( trim( (string) $header ) );
+				$header = (string) $header;
+				$header = preg_replace( '/^\xEF\xBB\xBF/', '', $header );
+				return strtolower( trim( $header ) );
 			},
             $headers
         );
@@ -602,7 +599,7 @@ class CBP_Update_Metadata_Plugin {
             array(
 				'name'             => $slug,
 				'post_type'        => array_values( get_post_types( array( 'public' => true ), 'names' ) ),
-				'post_status'      => 'any',
+				'post_status'      => 'publish',
 				'numberposts'      => -1,
 				'fields'           => 'ids',
 				'suppress_filters' => false,
